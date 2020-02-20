@@ -50,7 +50,6 @@ $(function(){
         var value = this.$('.actor-initiative .edit-form input').val();
         value = isNaN(parseInt(value)) ? "" : parseInt(value);
 
-        console.log('Updating initiative with', value);
         this.collection.selectedActor().save({order: value});
         this.hideInitiative();
       }
@@ -72,11 +71,9 @@ $(function(){
         var target_id = $(e.target).parent().attr('id');
         var condition = this.newCondition.val().replace(/^\s+|\s+$/g,'');
 
-        if(condition.length > 0){
-          this.collection.selectedActor().addCondition({title:condition, persistent: false});
-        } else {
-          console.log('skipping empty condition');
-        }
+        if (condition.length > 0){
+          this.collection.selectedActor().addCondition(Condition.newCondition(condition));
+        } 
 
         this.newCondition.blur();
         this.newConditionCell.hide();
@@ -111,7 +108,6 @@ $(function(){
     },
 
     render: function() {
-      console.log('marqueeview render event');
       var selectedActor = this.collection.selectedActor();
       if (selectedActor) {
         this.$el.html(this.template(selectedActor.toJSON()));
@@ -283,8 +279,6 @@ $(function(){
 
       this.addAll();
       this.onSessionUpdate();
-      // Actors.fetch();
-      // Environment.fetch();
 
       this.selectCurrent(Actors.activeActor());
     },
@@ -294,7 +288,6 @@ $(function(){
         var value = this.sessionInput.val();
         this.sessionForm.hide();
         this.sessionLabel.show();
-        console.log('Updating session name: ', value);
 
         this.sessionInput.val('');
         Sessions.setTitle(value);
@@ -306,11 +299,9 @@ $(function(){
       this.sessionLabel.hide();
       this.sessionForm.show();
       this.sessionInput.focus();
-      console.log('double click on session title change it');
     },
 
     onSessionUpdate: function() {
-      console.log('app: Game Session Changed');
       this.sessionLabel.html(Sessions.getTitle());
     },
 
@@ -345,6 +336,10 @@ $(function(){
           }
           Sessions.saveSession(Environment.toJSON(), Actors.toJSON());
           break;
+        case 102: // 'f'
+          Actors.selectedActor().incrementMatched("dying", 1);break;
+        case 103: // 'g'
+          Actors.selectedActor().incrementMatched("stabilizing", 1);break;
         case 106:  // 'j'
           Actors.downSelect(); break;
         case 107:  // 'k'
@@ -364,6 +359,10 @@ $(function(){
           this.editActorName(Actors.selectedActor(), e); break;
         case 73:  // 'I'
           this.editInitiative(Actors.selectedActor(), e); break;
+        case 71: // 'G'
+          Actors.selectedActor().incrementMatched("stabilizing", -1);break;
+        case 70: // 'F'
+          Actors.selectedActor().incrementMatched("dying", -1);break;
         case 68:  // 'D'
           this.deleteActor(Actors.selectedActor()); break;
         case 65:  // 'A'
@@ -376,26 +375,33 @@ $(function(){
           this.selectNextAndEditInitiative(e); break;
         case 60:  // '<'
           this.actorUp(); break;
-        case 55:  // '7'
-          this.toggleFeature(Actors.selectedActor(), 'used-reaction'); break;
         case 57:  // '9'
-          this.rotateFeature(Actors.selectedActor(), ['bloodied', 'dying', 'incapacitated', 'health-neutral']); break;
+          this.toggleFeature(Actors.selectedActor(), 'bloodied'); break;
+        case 56:  // '8'
+          this.toggleFeature(Actors.selectedActor(), 'concentrating'); break;
+        case 55:  // '7'
+          this.toggleReadied(Actors.selectedActor()); break;
         case 51:  // '3'
           this.rotateFeature(Actors.selectedActor(), ['defending', 'granting', 'defense-neutral']); break;
         case 50:  // '2'
           this.rotateFeature(Actors.selectedActor(), ['advantage', 'disadvantage', 'advantage-neutral']); break;
         case 49:  // '1'
-          this.toggleReadied(Actors.selectedActor()); break;
+          this.rotateFeature(Actors.selectedActor(), ['available', 'reacted']); break;
         case 48:  // '0'
-          this.toggleFeature(Actors.selectedActor(), 'persistent'); break;
+          Actors.selectedActor().actorDown(); break;
         case 45:  // '-'
           this.incrementLastConditionFromActor(Actors.selectedActor(), -1); break;
         case 43:  // '+'
           this.incrementLastConditionFromActor(Actors.selectedActor(), +1); break;
+        case 41:  // ')'
+          Actors.selectedActor().cleanupDeath(); break;
+        case 33:  // '!'
+          this.toggleReadied(Actors.selectedActor()); break;
+        case 80:  // 'P'
+          this.toggleFeature(Actors.selectedActor(), 'persistent'); break;
         case 710: // 'Shift-Option-I'
           this.resetAllInitiatives(e); break;
         case 91: // ] session dwn
-            console.log('switch session up');
             Sessions.saveSession(Environment.toJSON(), Actors.toJSON());
             Sessions.upSelect();
             Actors.reset(Sessions.getActors());
@@ -403,7 +409,6 @@ $(function(){
             break;
 
         case 93: // [ session up
-            console.log('switch session down');
             Sessions.saveSession(Environment.toJSON(), Actors.toJSON());
             Sessions.downSelect();
             Actors.reset(Sessions.getActors());
@@ -411,12 +416,10 @@ $(function(){
             break;
 
         case 115: // s Save session
-          console.log('Saving Session');
           Sessions.saveSession(Environment.toJSON(), Actors.toJSON());
           break;
 
         case 125: // } new session
-            console.log('new session');
             Sessions.saveSession(Environment.toJSON(), Actors.toJSON());
             Sessions.newSession();
             Actors.reset(Sessions.getActors());
@@ -424,18 +427,13 @@ $(function(){
             break;
 
         case 123: // } delete session
-            console.log('delete session');
             Sessions.saveSession(Environment.toJSON(), Actors.toJSON());
             var reset = window.confirm("Delete Game Session? This will remove the entire session!");
               if (reset) {
-                console.log('gone');
                 Sessions.removeSession();
                 Actors.reset(Sessions.getActors());
                 Environment.set(Sessions.getEnv());
-              } else {
-                console.log('sikeeeeee');
-                return;
-              }
+              } 
              break;
         default:
           console.log('Command key: ' + charCode + ' ' + e.key);
@@ -569,7 +567,7 @@ $(function(){
 
     toggleReadied: function( model ) {
       model.toggleFeature('readied' );
-      var readyString = model.get('title') + " ready";
+      var readyString = model.get('title') + " readied";
       if (model.hasFeature('readied')) {
         Environment.addAspect(readyString);
       } else {
@@ -678,5 +676,5 @@ $(function(){
   App.marquee = Marquee;
 
   // console debugging
-  window.Marquee = Marquee;
+  window.App = Marquee;
 });
